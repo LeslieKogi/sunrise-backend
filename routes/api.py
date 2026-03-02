@@ -83,13 +83,24 @@ def update_flavour(flavour_id):
 @api.route('/flavours/<int:flavour_id>', methods=['DELETE'])
 @jwt_required()
 def delete_flavour(flavour_id):
-    """Delete a flavour (admin)"""
     flavour = Flavour.query.get_or_404(flavour_id)
-    db.session.delete(flavour)
-    db.session.commit()
-    
-    return jsonify({'message': 'Flavour deleted successfully'}), 200
 
+    # ✅ SAFER: explicitly query OrderItem
+    items_using_flavour = OrderItem.query.filter_by(flavour_id=flavour_id).first()
+
+    if items_using_flavour:
+        return jsonify({
+            'error': 'Cannot delete flavour: it is in use by orders'
+        }), 400
+
+    try:
+        db.session.delete(flavour)
+        db.session.commit()
+        return jsonify({'message': 'Flavour deleted successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to delete flavour'}), 500
 
 # ==================== ORDER ROUTES ====================
 
